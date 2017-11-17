@@ -6,8 +6,7 @@ from keras.layers import Dense, Activation, Flatten
 from keras.optimizers import Adam
 
 from rl.agents.cem import CEMAgent
-#from cem import CEMAgent
-from props import PROPSAgent
+from rl.agents.props import PROPSAgent
 from rl.memory import EpisodeParameterMemory
 
 import matplotlib.pyplot as plt
