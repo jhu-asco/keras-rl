@@ -5,7 +5,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
 from keras.optimizers import Adam
 
-from props import PROPSAgent
+from rl.agents.props import PROPSAgent
 from rl.memory import EpisodeParameterMemory
 
 ENV_NAME = 'CartPole-v0'
