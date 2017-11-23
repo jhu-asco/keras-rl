@@ -8,7 +8,7 @@ from keras.models import Model
 
 from rl.core import Agent
 from rl.util import *
-from props_util import *
+from rl.agents.props_util import *
 from scipy.optimize import minimize
 import numpy.matlib
 
