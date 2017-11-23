@@ -81,10 +81,13 @@ def main(options):
     plt.plot(df_cem.rolling(window=train_interval_cem).mean())
 
     df_props = pd.DataFrame({'data': callback_props.history['episode_reward']})
-    #plt.plot(callback_props.history['episode_reward'])
+    #df_props_bound = pd.DataFrame({'bound': props.bound_vals})
+    #plt.plot(callback_props.history['episode_reward']) 
     plt.plot(df_props.rolling(window=batch_size_props).mean())
-
-    plt.legend(['cem', 'props'], loc='upper left')
+    plt.plot(props.bound_vals)
+    #print(props.bound_vals)
+    
+    plt.legend(['cem', 'props', 'props bound'], loc='upper left')
     plt.show()
     #plt.savefig('plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
 

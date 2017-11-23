@@ -56,6 +56,8 @@ class PROPSAgent(Agent):
         self.compiled = False
         self.reset_states()
 
+        self.bound_vals = [0]
+
     def reset_memory(self):
         self.memory = deepcopy(self.empty_memory)
         
@@ -132,11 +134,12 @@ class PROPSAgent(Agent):
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
+        
         if terminal:
             params = self.get_weights_flat(self.model.get_weights())
             self.memory.finalize_episode(params)
-
+            self.bound_vals.append(self.bound_vals[-1])
+            
             if self.episode % self.batch_size == 0 and self.episode > 0:
                 params, reward_totals = self.memory.sample(self.batch_size)
 		#print(params, reward_totals)
@@ -186,6 +189,8 @@ class PROPSAgent(Agent):
                 th_cov = res.x[(self.d+1):(2*self.d+1)]
                 self.curr_th_std = np.sqrt(th_cov)
 
+                self.bound_vals.append(-1*res.fun + 200)
+                
                 #print(self.curr_th_std[None, :][0])
                 #print("hello")
                 
