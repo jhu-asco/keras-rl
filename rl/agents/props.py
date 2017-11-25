@@ -142,10 +142,8 @@ class PROPSAgent(Agent):
             
             if self.episode % self.batch_size == 0 and self.episode > 0:
                 params, reward_totals = self.memory.sample(self.batch_size)
-		#print(params, reward_totals)
                 ths = np.array(params)
                 ys = np.array(reward_totals)
-                #ys_trans = -np.array([ys])
 		ys_trans = 200 - np.array([ys])
                 ths_trans = np.array([ths]).transpose(2, 1, 0)
 
@@ -190,9 +188,6 @@ class PROPSAgent(Agent):
                 self.curr_th_std = np.sqrt(th_cov)
 
                 self.bound_vals.append(-1*res.fun + 200)
-                
-                #print(self.curr_th_std[None, :][0])
-                #print("hello")
                 
                 # store policy distribution for future bounds computation
                 self.curr_pk = NormalDist(self.curr_th_mean, np.diag(th_cov))

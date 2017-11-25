@@ -53,8 +53,7 @@ def main(options):
     cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory, batch_size=batch_size_cem, nb_steps_warmup=1000, train_interval=train_interval_cem, elite_frac=0.05)
     cem.compile()
     callback_cem = cem.fit(env, nb_steps=steps_cem, visualize=False, verbose=0)
-    #cem.save_weights('cem_dumps/cem_{}_{}_ti_{}_bs_{}_steps_{}.h5f'.format(ENV_NAME, model_type, train_interval_cem, batch_size_cem, steps_cem), overwrite=True)
-    #cem.test(env, nb_episodes=1, visualize=False)
+    cem.save_weights('cem_dumps/cem_{}_{}_ti_{}_bs_{}_steps_{}.h5f'.format(ENV_NAME, model_type, train_interval_cem, batch_size_cem, steps_cem), overwrite=True)
 
     # PROPS
     # init environment
@@ -73,23 +72,17 @@ def main(options):
     props = PROPSAgent(model=model, nb_actions=nb_actions, memory=memory, Lmax=Lmax, delta=delta, bound_opts=bound_opts, batch_size=batch_size_props)
     props.compile()
     callback_props = props.fit(env, nb_steps=steps_props, visualize=False, verbose=0)
-    #props.save_weights('props_dumps/props_{}_{}_bs_{}_steps_{}_thres_{}_Lmax_{}_delta_{}.h5f'.format(ENV_NAME, model_type, batch_size_props, steps_props, trunc_thres, Lmax, delta), overwrite=True)
-    #props.test(env, nb_episodes=1, visualize=False)
+    props.save_weights('props_dumps/props_{}_{}_bs_{}_steps_{}_thres_{}_Lmax_{}_delta_{}.h5f'.format(ENV_NAME, model_type, batch_size_props, steps_props, trunc_thres, Lmax, delta), overwrite=True)
 
     df_cem = pd.DataFrame({'data': callback_cem.history['episode_reward']})
-    #plt.plot(callback_cem.history['episode_reward'])
     plt.plot(df_cem.rolling(window=train_interval_cem).mean())
 
     df_props = pd.DataFrame({'data': callback_props.history['episode_reward']})
-    #df_props_bound = pd.DataFrame({'bound': props.bound_vals})
-    #plt.plot(callback_props.history['episode_reward']) 
     plt.plot(df_props.rolling(window=batch_size_props).mean())
     plt.plot(props.bound_vals)
-    #print(props.bound_vals)
     
     plt.legend(['cem', 'props', 'props bound'], loc='upper left')
-    plt.show()
-    #plt.savefig('plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
+    plt.savefig('plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
 
 def initMemory():
     memory = EpisodeParameterMemory(limit=1000, window_length=1)
