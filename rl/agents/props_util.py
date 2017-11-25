@@ -381,10 +381,14 @@ def dist_jha_grad(a, pk, pks, Jss, kss, options):
         normalized_ws = M * ws / sum_ws
 
         dlts = dlogtrunc(a * Jss * normalized_ws)
- 
-        #dwdms = dpdms / p0s[:, :, np.newaxis]
-        dwdms = np.sign(dpdms) * np.exp(np.log(np.abs(dpdms)) - log_p0s[:, :, np.newaxis])
+
+	dwdms = np.sign(dpdms) * np.exp(np.log(np.abs(dpdms)) - log_p0s[:, :, np.newaxis])
         dwdSs = np.sign(dpdSs) * np.exp(np.log(np.abs(dpdSs)) - log_p0s[:, :, np.newaxis])
+        # If you see a warning for log divide by zero when truncate_wights is enabled, it is fine.
+        # It happens because we set dpdms to 0 for truncated weights above.  It does not cause any nans or infs in the final result
+        
+        #if np.any(dpdms == 0) and not np.any(np.logical_or(np.isnan(dwdms), np.isinf(dwdms))):
+        #    print 'Detected zero likelihood gradients (due to truncation probably): ignore warning for log divide by zero'
 
         sum_dwdms = np.sum(dwdms, axis=1)
         sum_dwdSs = np.sum(dwdSs, axis=1)
