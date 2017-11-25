@@ -382,7 +382,7 @@ def dist_jha_grad(a, pk, pks, Jss, kss, options):
 
         dlts = dlogtrunc(a * Jss * normalized_ws)
  
-	 dwdms = np.sign(dpdms) * np.exp(np.log(np.abs(dpdms)) - log_p0s[:, :, np.newaxis])
+	dwdms = np.sign(dpdms) * np.exp(np.log(np.abs(dpdms)) - log_p0s[:, :, np.newaxis])
         dwdSs = np.sign(dpdSs) * np.exp(np.log(np.abs(dpdSs)) - log_p0s[:, :, np.newaxis])
         # If you see a warning for log divide by zero when truncate_wights is enabled, it is fine.
         # It happens because we set dpdms to 0 for truncated weights above.  It does not cause any nans or infs in the final result
