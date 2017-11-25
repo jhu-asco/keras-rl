@@ -381,7 +381,7 @@ def dist_jha_grad(a, pk, pks, Jss, kss, options):
         normalized_ws = M * ws / sum_ws
 
         dlts = dlogtrunc(a * Jss * normalized_ws)
-
+ 
 	dwdms = np.sign(dpdms) * np.exp(np.log(np.abs(dpdms)) - log_p0s[:, :, np.newaxis])
         dwdSs = np.sign(dpdSs) * np.exp(np.log(np.abs(dpdSs)) - log_p0s[:, :, np.newaxis])
         # If you see a warning for log divide by zero when truncate_wights is enabled, it is fine.
