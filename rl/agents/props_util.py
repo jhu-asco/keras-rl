@@ -148,6 +148,7 @@ def log_mvnpdf_grad(x, m, S):
     ddS = -1 / (2 * S) + (x - m)**2 / (2 * S**2)
     return ddm, ddS
 
+
 def mvnpdf_grad(x, m, S):
     """
     Compute the gradient of a Gaussian pdf w.r.t. its mean and

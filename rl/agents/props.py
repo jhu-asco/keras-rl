@@ -8,14 +8,14 @@ from keras.models import Model
 
 from rl.core import Agent
 from rl.util import *
-from props_util import *
+from rl.agents.props_util import *
 from scipy.optimize import minimize
 import numpy.matlib
 
 class PROPSAgent(Agent):
-    def __init__(self, model, nb_actions, memory, th_mean=None, batch_size=50, nb_steps_warmup=1000,
-                 train_interval=50, memory_interval=1, delta=0.05, bound_opts={},
-                 n_iter=10000, Lmax=10, initial_std=1.0, **kwargs):
+    def __init__(self, model, nb_actions, memory, th_mean=None, batch_size=500,
+                 delta=0.05, bound_opts={},
+                 Lmax=10, initial_std=1.0, **kwargs):
         super(PROPSAgent, self).__init__(**kwargs)
 
         # Related objects
@@ -31,11 +31,7 @@ class PROPSAgent(Agent):
             th_mean = np.zeros(self.num_weights)
         self.nb_actions = nb_actions
         self.batch_size = batch_size
-        self.nb_steps_warmup = nb_steps_warmup
-        self.train_interval = train_interval
-        self.memory_interval = memory_interval
         self.delta = delta
-        self.n_iter = n_iter
         self.Lmax = Lmax
         self.curr_th_mean = th_mean
         self.curr_th_std = np.ones_like(th_mean) * initial_std
@@ -59,6 +55,8 @@ class PROPSAgent(Agent):
         self.episode = 0
         self.compiled = False
         self.reset_states()
+
+        self.bound_vals = [0]
 
     def reset_memory(self):
         self.memory = deepcopy(self.empty_memory)
@@ -126,7 +124,7 @@ class PROPSAgent(Agent):
     @property
     def layers(self):
         return self.model.layers[:]
-         
+
     def backward(self, reward, terminal):
 	#print(self.episode)
         self.memory.append(self.recent_observation, self.recent_action, reward, terminal, training=self.training)
@@ -136,20 +134,17 @@ class PROPSAgent(Agent):
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
+        
         if terminal:
             params = self.get_weights_flat(self.model.get_weights())
             self.memory.finalize_episode(params)
-
-            #if self.step > self.nb_steps_warmup and self.episode % self.train_interval == 0:
-            #if len(self.memory.total_rewards.data) == self.batch_size:
+            self.bound_vals.append(self.bound_vals[-1])
+            
             if self.episode % self.batch_size == 0 and self.episode > 0:
                 params, reward_totals = self.memory.sample(self.batch_size)
-		#print(params, reward_totals)
                 ths = np.array(params)
                 ys = np.array(reward_totals)
-                #ys_trans = -np.array([ys])
-		ys_trans = (200 - np.array([ys]))/20
+		ys_trans = 200 - np.array([ys])
                 ths_trans = np.array([ths]).transpose(2, 1, 0)
 
                 if self.yss is None:
@@ -192,8 +187,7 @@ class PROPSAgent(Agent):
                 th_cov = res.x[(self.d+1):(2*self.d+1)]
                 self.curr_th_std = np.sqrt(th_cov)
 
-                #print(self.curr_th_std[None, :][0])
-                #print("hello")
+                self.bound_vals.append(-1*res.fun + 200)
                 
                 # store policy distribution for future bounds computation
                 self.curr_pk = NormalDist(self.curr_th_mean, np.diag(th_cov))
