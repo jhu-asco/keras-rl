@@ -1,4 +1,4 @@
-import autograd.numpy as np
+import numpy as np
 import numpy.linalg
 import numpy.matlib
 import math
