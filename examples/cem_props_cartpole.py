@@ -25,6 +25,7 @@ parser.add_argument("--steps_props", default=100000, type=int)
 parser.add_argument("--trunc_thres", default=1, type=float)
 parser.add_argument("--Lmax", default=10, type=int)
 parser.add_argument("--delta", default=0.05, type=float)
+parser.add_argument("--outpath", default="outputs/")
 
 def main(options):
     # store args
@@ -37,6 +38,7 @@ def main(options):
     trunc_thres = options.trunc_thres
     Lmax = options.Lmax
     delta = options.delta
+    outpath = options.outpath
 
     # CEM
     # init environment
@@ -53,7 +55,7 @@ def main(options):
     cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory, batch_size=batch_size_cem, nb_steps_warmup=1000, train_interval=train_interval_cem, elite_frac=0.05)
     cem.compile()
     callback_cem = cem.fit(env, nb_steps=steps_cem, visualize=False, verbose=0)
-    cem.save_weights('cem_dumps/cem_{}_{}_ti_{}_bs_{}_steps_{}.h5f'.format(ENV_NAME, model_type, train_interval_cem, batch_size_cem, steps_cem), overwrite=True)
+    cem.save_weights(outpath + 'cem_dumps/cem_{}_{}_ti_{}_bs_{}_steps_{}.h5f'.format(ENV_NAME, model_type, train_interval_cem, batch_size_cem, steps_cem), overwrite=True)
 
     # PROPS
     # init environment
@@ -72,7 +74,7 @@ def main(options):
     props = PROPSAgent(model=model, nb_actions=nb_actions, memory=memory, Lmax=Lmax, delta=delta, bound_opts=bound_opts, batch_size=batch_size_props)
     props.compile()
     callback_props = props.fit(env, nb_steps=steps_props, visualize=False, verbose=0)
-    props.save_weights('props_dumps/props_{}_{}_bs_{}_steps_{}_thres_{}_Lmax_{}_delta_{}.h5f'.format(ENV_NAME, model_type, batch_size_props, steps_props, trunc_thres, Lmax, delta), overwrite=True)
+    props.save_weights(outpath + 'props_dumps/props_{}_{}_bs_{}_steps_{}_thres_{}_Lmax_{}_delta_{}.h5f'.format(ENV_NAME, model_type, batch_size_props, steps_props, trunc_thres, Lmax, delta), overwrite=True)
 
     df_cem = pd.DataFrame({'data': callback_cem.history['episode_reward']})
     plt.plot(df_cem.rolling(window=train_interval_cem).mean())
@@ -82,7 +84,7 @@ def main(options):
     plt.plot(props.bound_vals)
     
     plt.legend(['cem', 'props', 'props bound'], loc='upper left')
-    plt.savefig('plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
+    plt.savefig(outpath + 'plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
 
 def initMemory():
     memory = EpisodeParameterMemory(limit=1000, window_length=1)
@@ -95,7 +97,6 @@ def initModel(model_type, nb_actions, obs_space_shape):
         model.add(Dense(nb_actions))
         model.add(Activation('softmax'))
     else:
-        model = Sequential()
         model.add(Flatten(input_shape=(1,) + obs_space_shape))
         model.add(Dense(16))
         model.add(Activation('relu'))
