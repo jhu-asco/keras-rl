@@ -51,8 +51,10 @@ def main(options):
     
     model = initModel(model_type, nb_actions, env.observation_space.shape)
     memory = initMemory()
+
+    bound_opts = {'analytic_jac' : False, 'normalize_weights' : True, 'truncate_weights' : True, 'truncate_thresh' : trunc_thres}
     
-    cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory, batch_size=batch_size_cem, nb_steps_warmup=1000, train_interval=train_interval_cem, elite_frac=0.05)
+    cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory, batch_size=batch_size_cem, nb_steps_warmup=1000, train_interval=train_interval_cem, elite_frac=0.05, bound_opts=bound_opts)
     cem.compile()
     callback_cem = cem.fit(env, nb_steps=steps_cem, visualize=False, verbose=0)
     cem.save_weights(outpath + 'cem_dumps/cem_{}_{}_ti_{}_bs_{}_steps_{}.h5f'.format(ENV_NAME, model_type, train_interval_cem, batch_size_cem, steps_cem), overwrite=True)
@@ -78,12 +80,13 @@ def main(options):
 
     df_cem = pd.DataFrame({'data': callback_cem.history['episode_reward']})
     plt.plot(df_cem.rolling(window=train_interval_cem).mean())
+    plt.plot(cem.bound_vals)
 
     df_props = pd.DataFrame({'data': callback_props.history['episode_reward']})
     plt.plot(df_props.rolling(window=batch_size_props).mean())
     plt.plot(props.bound_vals)
     
-    plt.legend(['cem', 'props', 'props bound'], loc='upper left')
+    plt.legend(['cem', 'cem bound', 'props', 'props bound'], loc='upper left')
     plt.savefig(outpath + 'plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
 
 def initMemory():

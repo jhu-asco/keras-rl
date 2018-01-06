@@ -8,13 +8,14 @@ from keras.models import Model
 
 from rl.core import Agent
 from rl.util import *
+from rl.agents.props_util import *
 
 class CEMAgent(Agent):
     """Write me
     """
     def __init__(self, model, nb_actions, memory, batch_size=50, nb_steps_warmup=1000,
                  train_interval=50, elite_frac=0.05, memory_interval=1, theta_init=None,
-                 noise_decay_const=0.0, noise_ampl=0.0, **kwargs):
+                 noise_decay_const=0.0, noise_ampl=0.0, delta=0.05, Lmax=10, bound_opts={}, **kwargs):
         super(CEMAgent, self).__init__(**kwargs)
 
         # Parameters.
@@ -51,6 +52,19 @@ class CEMAgent(Agent):
         self.episode = 0
         self.compiled = False
         self.reset_states()
+
+        # bound stuff
+        self.delta = delta
+        self.Lmax = Lmax
+        self.bound_opts = bound_opts
+        self.curr_th_mean = np.zeros(self.num_weights)
+        self.curr_th_std = np.ones_like(self.curr_th_mean) * self.init_stdev
+        self.pk0 = NormalDist(self.curr_th_mean, np.diag(np.power(self.curr_th_std, 2)))
+        self.curr_pk = self.pk0
+        self.pks = [self.pk0]
+        self.yss = None
+        self.thss = None
+        self.bound_vals = [0]
 
     def compile(self):
         self.model.compile(optimizer='sgd', loss='mse')
@@ -145,9 +159,27 @@ class CEMAgent(Agent):
         if terminal:
             params = self.get_weights_flat(self.model.get_weights())
             self.memory.finalize_episode(params)
+            self.bound_vals.append(self.bound_vals[-1])
 
             if self.step > self.nb_steps_warmup and self.episode % self.train_interval == 0:
                 params, reward_totals = self.memory.sample(self.batch_size)
+
+                # bound stuff
+                ths = np.array(params)
+                ys = np.array(reward_totals)
+		ys_trans = 200 - np.array([ys])
+                ths_trans = np.array([ths]).transpose(2, 1, 0)
+
+                if self.yss is None:
+                    self.yss = ys_trans
+                else:
+                    self.yss = np.append(self.yss, ys_trans, axis=0)
+
+                if self.thss is None:
+                    self.thss = ths_trans
+                else:
+                    self.thss = np.append(self.thss, ths_trans, axis=2)
+                
                 best_idx = np.argsort(np.array(reward_totals))[-self.num_best:]
                 best = np.vstack([params[i] for i in best_idx])
 
@@ -163,6 +195,17 @@ class CEMAgent(Agent):
                 std = np.std(best, axis=0) + min_std
                 new_theta = np.hstack((mean, std))
                 self.update_theta(new_theta)
+
+                #bound_val = dist_bound_robust_cost_func(a_and_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax, self.bound_opts)
+                #a = 0.0000000001
+                a = 1
+                bound_val, _, _ = dist_bound_robust(a, self.curr_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax, self.bound_opts)
+                self.bound_vals.append(-1*bound_val + 200)
+
+                self.curr_th_mean = mean
+                self.curr_th_std = std
+                self.curr_pk = NormalDist(self.curr_th_mean, np.diag(np.power(self.curr_th_std, 2)))
+                self.pks.append(self.curr_pk)
             self.choose_weights()
             self.episode += 1
         return metrics
