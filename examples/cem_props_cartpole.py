@@ -80,13 +80,14 @@ def main(options):
 
     df_cem = pd.DataFrame({'data': callback_cem.history['episode_reward']})
     plt.plot(df_cem.rolling(window=train_interval_cem).mean())
-    plt.plot(cem.bound_vals)
+    #plt.plot(cem.bound_vals)
 
     df_props = pd.DataFrame({'data': callback_props.history['episode_reward']})
     plt.plot(df_props.rolling(window=batch_size_props).mean())
     plt.plot(props.bound_vals)
-    
-    plt.legend(['cem', 'cem bound', 'props', 'props bound'], loc='upper left')
+
+    plt.legend(['cem', 'props', 'props bound'], loc='upper left')
+    #plt.legend(['cem', 'cem bound', 'props', 'props bound'], loc='upper left')
     plt.savefig(outpath + 'plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
 
 def initMemory():
@@ -103,10 +104,10 @@ def initModel(model_type, nb_actions, obs_space_shape):
         model.add(Flatten(input_shape=(1,) + obs_space_shape))
         model.add(Dense(16))
         model.add(Activation('relu'))
-        model.add(Dense(16))
-        model.add(Activation('relu'))
-        model.add(Dense(16))
-        model.add(Activation('relu'))
+        #model.add(Dense(16))
+        #model.add(Activation('relu'))
+        #model.add(Dense(16))
+        #model.add(Activation('relu'))
         model.add(Dense(nb_actions))
         model.add(Activation('softmax'))
     return model
