@@ -9,6 +9,7 @@ from keras.models import Model
 from rl.core import Agent
 from rl.util import *
 from rl.agents.props_util import *
+from scipy.optimize import minimize
 
 class CEMAgent(Agent):
     """Write me
@@ -65,6 +66,10 @@ class CEMAgent(Agent):
         self.yss = None
         self.thss = None
         self.bound_vals = [0]
+        self.a = 1
+        self.tol = 1e-20
+        self.min_var = 1e-3;
+        self.d = self.curr_th_mean.size
 
     def compile(self):
         self.model.compile(optimizer='sgd', loss='mse')
@@ -179,7 +184,11 @@ class CEMAgent(Agent):
                     self.thss = ths_trans
                 else:
                     self.thss = np.append(self.thss, ths_trans, axis=2)
-                
+
+                # Setup box constraints on optimization vector        
+                box_constraints = [(self.tol, None)] # alpha > 0
+                    
+                # CEM actual stuff
                 best_idx = np.argsort(np.array(reward_totals))[-self.num_best:]
                 best = np.vstack([params[i] for i in best_idx])
 
@@ -196,11 +205,14 @@ class CEMAgent(Agent):
                 new_theta = np.hstack((mean, std))
                 self.update_theta(new_theta)
 
-                #bound_val = dist_bound_robust_cost_func(a_and_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax, self.bound_opts)
-                #a = 0.0000000001
-                a = 1
-                bound_val, _, _ = dist_bound_robust(a, self.curr_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax, self.bound_opts)
-                self.bound_vals.append(-1*bound_val + 200)
+                # calculate bound stuff
+                analytic_jac = self.bound_opts.get('analytic_jac')
+                a0 = self.a
+                bound = lambda a : self.bound_util(a)
+                res = minimize(bound, a0, method='L-BFGS-B', jac=analytic_jac, bounds=box_constraints, options={'disp' : False})
+
+                self.a = res.x
+                self.bound_vals.append(-1*res.fun + 200)
 
                 self.curr_th_mean = mean
                 self.curr_th_std = std
@@ -219,3 +231,7 @@ class CEMAgent(Agent):
         if self.processor is not None:
             names += self.processor.metrics_names[:]
         return names
+
+    def bound_util(self, a):
+        val, _, _ = dist_bound_robust(a, self.curr_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax, self.bound_opts)
+        return val
