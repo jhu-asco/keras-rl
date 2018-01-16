@@ -159,7 +159,8 @@ class PROPSProximalAgent(Agent):
                 # minimize using L-BFGS-B
                 analytic_jac = self.bound_opts.get('analytic_jac')
                 bound = lambda pk : dist_bound_cost_func_2(pk, self.pks, self.yss, self.thss, self.Lmax, self.bound_opts)
-                res = minimize(bound, self.curr_pk, method='L-BFGS-B', jac=analytic_jac, options={'disp' : False})
+                x0 = np.concatenate((self.curr_pk.m,  np.diag(self.curr_pk.S)))
+                res = minimize(bound, x0, method='L-BFGS-B', jac=analytic_jac, options={'disp' : False})
 
                 # convert opt vector to variables
                 self.curr_th_mean = res.x[0:(self.d)]
@@ -174,7 +175,7 @@ class PROPSProximalAgent(Agent):
                 box_constraints = [(self.tol, None)] # alpha > 0
                 a0 = self.a
                 bound = lambda a : self.bound_util(a)
-                res = minimize(bound, a0, method='L-BFGS-B', jac=analytic_jac, bounds=box_constraints, options={'disp' : False})
+                res = minimize(bound, a0, method='L-BFGS-B', jac=False, bounds=box_constraints, options={'disp' : False})
                 self.a = res.x
                 self.bound_vals.append(-1*res.fun + 200)
 

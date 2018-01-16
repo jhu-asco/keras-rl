@@ -206,10 +206,9 @@ class CEMAgent(Agent):
                 self.update_theta(new_theta)
 
                 # calculate bound stuff
-                analytic_jac = self.bound_opts.get('analytic_jac')
                 a0 = self.a
                 bound = lambda a : self.bound_util(a)
-                res = minimize(bound, a0, method='L-BFGS-B', jac=analytic_jac, bounds=box_constraints, options={'disp' : False})
+                res = minimize(bound, a0, method='L-BFGS-B', jac=False, bounds=box_constraints, options={'disp' : False})
 
                 self.a = res.x
                 self.bound_vals.append(-1*res.fun + 200)

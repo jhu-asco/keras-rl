@@ -209,7 +209,7 @@ def dist_bound_robust_cost_func(
         return Jrob
 
 def dist_bound_cost_func_2(
-    pk,
+    pk_in,
     pks,
     Js,
     ks,
@@ -222,12 +222,14 @@ def dist_bound_cost_func_2(
     assert(ks.shape[2] == L)
     d = len(pks[0].m)
 
+    pk = NormalDist(pk_in[0:(d)], np.diag(pk_in[(d):(2 * d)]))
+    
     if options.get('analytic_jac'):
-        Jrob, _, _, Jac = dist_bound_robust(
+        Jrob, _, _, Jac = dist_bound_2(
             pk, pks, Js, ks, Lmax, options)
-        return (Jrob, np.concatenate(([Jac[2]], Jac[0], Jac[1])))
+        return (Jrob, np.concatenate((Jac[0], Jac[1])))
     else:
-        Jrob, _, _ = dist_bound_robust(
+        Jrob, _, _ = dist_bound_2(
             pk, pks, Js, ks, Lmax, options)
         return Jrob
 
@@ -533,6 +535,33 @@ def dist_jha_grad(a, pk, pks, Jss, kss, options):
     
     return djdm, djdS, djda
 
+def dist_jha_grad_2(pk, pks, Jss, kss, options):
+    """
+    Compute the gradient of the robust expected cost with respect to pk and a
+    """
+    L = Jss.shape[0]
+    M = Jss.shape[1]
+    d = pk.m.shape[0]
+
+    assert len(pks) == L
+    assert kss.shape[2] == L
+    assert kss.shape[1] == M
+
+    kss_trans = np.transpose(kss, axes=[2, 1, 0])
+    log_p0s = np.zeros((L, M))
+    for i in range(0, L):
+        log_p0s[i, :] = log_mvnpdf(
+            kss[:, :, i].transpose(), mean=pks[i].m, cov=pks[i].S)
+    p0s = np.exp(log_p0s)
+
+    dpdms, dpdSs = mvnpdf_grad(kss_trans, pk.m, np.diag(pk.S))
+    
+    djdm = np.sum(Jss[:, :, np.newaxis] * dpdms /
+                      p0s[:, :, np.newaxis], axis=(0, 1)) / (M * L)
+    djdS = np.sum(Jss[:, :, np.newaxis] * dpdSs /
+                      p0s[:, :, np.newaxis], axis=(0, 1)) / (M * L)
+    
+    return djdm, djdS
 
 def dist_bound_robust_grad(a, pk, pks, Jss, kss, Jmaxs, rdas, delta,
                            options={'normalize_weights': True}):
@@ -557,6 +586,28 @@ def dist_bound_robust_grad(a, pk, pks, Jss, kss, Jmaxs, rdas, delta,
 
     return djdm, djdS, djda
 
+def dist_bound_grad_2(pk, pks, Jss, kss, rdas,
+                           options={'normalize_weights': True}):
+    L = Jss.shape[0]
+    M = Jss.shape[1]
+    d = len(pk.m)
+
+    assert len(pks) == L
+    assert kss.shape[1] == M
+    assert kss.shape[2] == L
+
+    djdm, djdS = dist_jha_grad_2(pk, pks, Jss, kss, options)
+
+    B = 1.0 # tuning param
+    
+    drdms = np.zeros((d, L))
+    drdSs = np.zeros((d, L))
+    for i in range(0, L):
+        drdms[:, i], drdSs[:, i] = renyii_grad(pk, pks[i], 1)
+    djdS += np.sum(drdSs * B, axis=1)
+    djdm += np.sum(drdms * B, axis=1)
+
+    return djdm, djdS
 
 def r2_cross(scalar, vector):
     vector_out = np.zeros(2)
