@@ -208,6 +208,29 @@ def dist_bound_robust_cost_func(
             a, pk, pks, Js, ks, delta, Lmax, options)
         return Jrob
 
+def dist_bound_cost_func_2(
+    pk,
+    pks,
+    Js,
+    ks,
+    Lmax,
+    options={
+        "analytic_jac": False,
+        "normalize_weights": True}):
+    L = Js.shape[0]
+    assert(len(pks) == L)
+    assert(ks.shape[2] == L)
+    d = len(pks[0].m)
+
+    if options.get('analytic_jac'):
+        Jrob, _, _, Jac = dist_bound_robust(
+            pk, pks, Js, ks, Lmax, options)
+        return (Jrob, np.concatenate(([Jac[2]], Jac[0], Jac[1])))
+    else:
+        Jrob, _, _ = dist_bound_robust(
+            pk, pks, Js, ks, Lmax, options)
+        return Jrob
+
 
 def dist_bound_robust(
     a, pk, pks, Js, ks, delta, Lmax, options={
@@ -282,6 +305,76 @@ def dist_bound_robust(
     else:
         return Jrob, Jha, Jh
 
+def dist_bound_2(
+    pk, pks, Js, ks, Lmax, options={
+        'analytic_jac': False}):
+    """
+    Find the bound on J for a policy distribution pk based
+    on performances of samples (Js, ks) from past distributions pks
+
+    Lmax - number of past batches to consider from list
+    compute_jac - compute the jacobian
+    """
+
+    if Lmax < 0:
+        i0 = 0
+    else:
+        i0 = max(0, Js.shape[0] - Lmax)
+
+    pks = pks[i0:]
+    Js = Js[i0:, :]
+    ks = ks[:, :, i0:]
+
+    M = Js.shape[1]
+    L = Js.shape[0]
+
+    assert(len(pks) == L)
+    assert(ks.shape[2] == L)
+
+    rdas = np.zeros(L)
+
+    # Do everything in log space to avoid numerical issues (like overflow)
+    log_ps = log_mvnpdf(np.transpose(
+        ks, axes=[2, 1, 0]), mean=pk.m, cov=pk.S)
+    log_p0s = np.zeros([L, M])
+    for i in range(0, L):
+        rdas[i] = renyii(pk, pks[i], 1)
+        log_p0s[i, :] = log_mvnpdf(
+            ks[:, :, i].transpose(), mean=pks[i].m, cov=pks[i].S)
+    if np.any(rdas < 0):
+        print("RENYII TERM IS NEGATIVE!!!")
+
+    wss = np.exp(log_ps - log_p0s)
+    if options.get('truncate_weights'):
+	#print("truncating")
+        truncate_thresh = options.get('truncate_thresh')
+        if truncate_thresh == None:
+            # truncate weights based on 
+            # Ionides, Truncated Importance Sampling, 2008
+            truncate_thresh = np.sqrt(M)
+        wss = np.minimum(wss, truncate_thresh) # truncate weights
+
+    normalization_constant = np.sum(wss, axis=1)
+    wss_sum_nonzero_idx = normalization_constant != 0
+    # take care of potential divide by zero
+    wss[normalization_constant == 0, :] = 1
+    if options.get('normalize_weights'):
+        # Introduces small bias but reduces variance
+        wss[wss_sum_nonzero_idx, :] *= \
+            (M / normalization_constant[wss_sum_nonzero_idx])[:, np.newaxis]
+
+    # Weights diagnostics
+    M_effective = np.sum(wss, axis=1)**2 / np.sum(wss * wss, axis=1)
+    #print("M_effective=\t" + str(M_effective))
+
+    Jrob, Jha, Jh = bound_all_2(wss, Js, rdas)
+    if options.get('analytic_jac'):
+        jac = dist_bound_grad_2(
+            pk, pks, Js, ks, rdas, options)
+        return Jrob, Jha, Jh, jac
+    else:
+        return Jrob, Jha, Jh
+
 
 def bound_robust_all(a, wss, Jss, rdas, Jmaxs, delta):
     M = Jss.shape[1]
@@ -295,6 +388,23 @@ def bound_robust_all(a, wss, Jss, rdas, Jmaxs, delta):
     com_term = math.log(1. / delta) / (a * M * L)
     # compute bound
     Jrob = Jha + divergence_term + com_term
+    # compute empirical cost
+    Jh = np.sum(Jss * wss) / M
+
+    return Jrob, Jha, Jh
+
+def bound_all_2(wss, Jss, rdas):
+    M = Jss.shape[1]
+    L = Jss.shape[0]
+
+    B = 1.0 # tuning param
+    
+    # robust empirical estimate
+    Jha = jha_2(wss, Jss)
+    # regularizing term
+    divergence_term = np.sum(rdas) * B
+    # compute bound
+    Jrob = Jha + divergence_term
     # compute empirical cost
     Jh = np.sum(Jss * wss) / M
 
@@ -339,6 +449,16 @@ def jha(a, wss, Jss):
     L = Jss.shape[0]
     M = Jss.shape[1]
     return np.sum(logtrunc(a * Jss * wss)) / (M * L * a)
+
+def jha_2(wss, Jss):
+    """
+    Compute the robust empirical estimate of expected cost using
+    weights wss corresponding to costs Jss
+    """
+
+    L = Jss.shape[0]
+    M = Jss.shape[1]
+    return np.sum(Jss * wss) / (M * L)
 
 
 def dist_jha_grad(a, pk, pks, Jss, kss, options):
