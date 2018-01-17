@@ -87,7 +87,7 @@ def kl(pk0, pk1):
     r = 0.5 * r
 
     # return max(r, 0)
-    return r
+    return max(r, 0)
 
 def kl_grad(pk0, pk1):
     # Check diagonal
@@ -101,7 +101,7 @@ def kl_grad(pk0, pk1):
     drdm = -1 * np.dot(dm, np.linalg.inv(pk1.S))
 
     drdS = np.trace(np.linalg.inv(pk1.S))
-    #drdS = drdS + ... TODO
+    drdS = drdS - detprime(pk0.S) / np.linalg.det(pk0.S)
     drdS = 0.5 * drdS
     
     return drdm, drdS

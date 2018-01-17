@@ -84,10 +84,10 @@ def main(options):
 
     df_props = pd.DataFrame({'data': callback_props.history['episode_reward']})
     plt.plot(df_props.rolling(window=batch_size_props).mean())
-    #plt.plot(props.bound_vals)
+    plt.plot(props.bound_vals)
     
-    plt.legend(['cem', 'props'], loc='upper left')
-    #plt.legend(['cem', 'props', 'props bound'], loc='upper left')
+    #plt.legend(['cem', 'props'], loc='upper left')
+    plt.legend(['cem', 'props', 'props bound'], loc='upper left')
     #plt.legend(['cem', 'cem bound', 'props', 'props bound'], loc='upper left')
     plt.savefig(outpath + 'plots/{}_{}_bs_{}_thres_{}_Lmax_{}_delta_{}.jpeg'.format(ENV_NAME, model_type, batch_size_props, trunc_thres, Lmax, delta))
 
