@@ -42,7 +42,6 @@ def renyii_grad(pk0, pk1, a):
         ((1-a) / diag_Sa - (1-a) / diag_p0S)/2./(1-a)
     return drdm, drdS
 
-
 def renyii(pk0, pk1, a):
     """
     Compute the renyii divergence between two Gaussian distributions.
@@ -78,6 +77,34 @@ def renyii(pk0, pk1, a):
     #assert(r > -1e-10)
     return max(r, 0)
 
+def kl(pk0, pk1):
+    assert(pk0.S.shape == pk1.S.shape)
+
+    dm = pk1.m - pk0.m
+    d = pk0.S.shape[0]
+    r = np.log(np.linalg.det(pk1.S) / np.linalg.det(pk0.S)) - d + np.trace(np.dot(np.linalg.inv(pk1.S), pk0.S))
+    r = r + np.dot(np.dot(dm, np.linalg.inv(pk1.S)), dm)
+    r = 0.5 * r
+
+    # return max(r, 0)
+    return r
+
+def kl_grad(pk0, pk1):
+    # Check diagonal
+    assert(np.all(np.diag(np.diag(pk0.S)) == pk0.S))
+    assert(np.all(np.diag(np.diag(pk1.S)) == pk1.S))
+    # Check dimensions
+    assert(pk0.S.shape == pk1.S.shape)
+
+    dm = pk1.m - pk0.m
+    
+    drdm = -1 * np.dot(dm, np.linalg.inv(pk1.S))
+
+    drdS = np.trace(np.linalg.inv(pk1.S))
+    #drdS = drdS + ... TODO
+    drdS = 0.5 * drdS
+    
+    return drdm, drdS
 
 def is_mvnpdf_baseline(pk, ws, ks, Js):
     """
@@ -340,7 +367,7 @@ def dist_bound_2(
         ks, axes=[2, 1, 0]), mean=pk.m, cov=pk.S)
     log_p0s = np.zeros([L, M])
     for i in range(0, L):
-        rdas[i] = renyii(pk, pks[i], 1)
+        rdas[i] = kl(pk, pks[i])
         log_p0s[i, :] = log_mvnpdf(
             ks[:, :, i].transpose(), mean=pks[i].m, cov=pks[i].S)
     if np.any(rdas < 0):
@@ -554,6 +581,7 @@ def dist_jha_grad_2(pk, pks, Jss, kss, options):
             kss[:, :, i].transpose(), mean=pks[i].m, cov=pks[i].S)
     p0s = np.exp(log_p0s)
 
+    #print(np.diag(pk.S))
     dpdms, dpdSs = mvnpdf_grad(kss_trans, pk.m, np.diag(pk.S))
     
     djdm = np.sum(Jss[:, :, np.newaxis] * dpdms /
@@ -603,7 +631,7 @@ def dist_bound_grad_2(pk, pks, Jss, kss, rdas,
     drdms = np.zeros((d, L))
     drdSs = np.zeros((d, L))
     for i in range(0, L):
-        drdms[:, i], drdSs[:, i] = renyii_grad(pk, pks[i], 1)
+        drdms[:, i], drdSs[:, i] = kl_grad(pk, pks[i])
     djdS += np.sum(drdSs * B, axis=1)
     djdm += np.sum(drdms * B, axis=1)
 

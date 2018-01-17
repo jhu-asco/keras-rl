@@ -156,20 +156,35 @@ class PROPSProximalAgent(Agent):
                 else:
                     self.thss = np.append(self.thss, ths_trans, axis=2)
 
+                # Setup box constraints on optimization vector        
+                box_constraints = []
+                # no constraints for mean
+                for i in range(0, self.d):
+                    box_constraints.append((None, None))
+                # need covariance greater than 0 and upper bound which yields valid renyii terms
+                j0 = max(0, len(self.pks) - self.Lmax)
+                for i in range(0, self.d):
+                    Sub_i = None
+                    for j in range(j0, len(self.pks)):
+                        if Sub_i is None:
+                            Sub_i = 2*self.pks[j].S[i,i] - 100*self.tol
+                        else:
+                            Sub_i = min(Sub_i, 2*self.pks[j].S[i,i] - 100*self.tol)
+                    box_constraints.append((self.min_var, Sub_i))
+                    
                 # minimize using L-BFGS-B
                 analytic_jac = self.bound_opts.get('analytic_jac')
                 bound = lambda pk : dist_bound_cost_func_2(pk, self.pks, self.yss, self.thss, self.Lmax, self.bound_opts)
                 x0 = np.concatenate((self.curr_pk.m,  np.diag(self.curr_pk.S)))
-                res = minimize(bound, x0, method='L-BFGS-B', jac=analytic_jac, options={'disp' : False})
+                res = minimize(bound, x0, method='L-BFGS-B', jac=analytic_jac, bounds=box_constraints, options={'disp' : False})
 
                 # convert opt vector to variables
                 self.curr_th_mean = res.x[0:(self.d)]
                 th_cov = res.x[(self.d):(2*self.d)]
                 self.curr_th_std = np.sqrt(th_cov)
                 
-                # store policy distribution for future bounds computation
+                # store policy distribution
                 self.curr_pk = NormalDist(self.curr_th_mean, np.diag(th_cov))
-                self.pks.append(self.curr_pk)
 
                 # bound calc
                 box_constraints = [(self.tol, None)] # alpha > 0
@@ -178,6 +193,9 @@ class PROPSProximalAgent(Agent):
                 res = minimize(bound, a0, method='L-BFGS-B', jac=False, bounds=box_constraints, options={'disp' : False})
                 self.a = res.x
                 self.bound_vals.append(-1*res.fun + 200)
+
+                # store policy distribution
+                self.pks.append(self.curr_pk)
 
                 metrics = [np.mean(np.array(reward_totals))]
                 if self.processor is not None:
@@ -200,5 +218,5 @@ class PROPSProximalAgent(Agent):
         return names
 
     def bound_util(self, a):
-        val, _, _ = dist_bound_robust(a, self.curr_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax, self.bound_opts)
+        val, _, _ = dist_bound_robust(a, self.curr_pk, self.pks, self.yss, self.thss, self.delta, self.Lmax)
         return val
