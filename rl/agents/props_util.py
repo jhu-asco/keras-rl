@@ -6,6 +6,7 @@ from scipy.stats import multivariate_normal
 
 B = 5.95925 # tuning param
 B = 0.000001
+B = 1.0
 
 class NormalDist:
     """
@@ -457,6 +458,26 @@ def dist_jha(a, pk, pks, Jss, kss):
             ws = M * ws / np.sum(ws)
         wss[i, :] = ws
     return jha(a, wss, Jss)
+
+def dist_jha_2(pk, pks, Jss, kss):
+    L = Jss.shape[0]
+    M = Jss.shape[1]
+
+    wss = np.zeros([L, M])
+    for i in range(0, L):
+        ps = multivariate_normal.pdf(
+            kss[:, :, i].transpose(), mean=pk.m, cov=pk.S)
+        p0s = multivariate_normal.pdf(
+            kss[:, :, i].transpose(), mean=pks[i].m, cov=pks[i].S)
+        ws = ps / p0s
+        sum_ws = np.sum(ws)
+        if sum_ws == 0:
+            ws = np.ones_like(ws)  # avoid divide by zero
+        else:
+            ws = M * ws / np.sum(ws)
+        wss[i, :] = ws
+    return jha_2(wss, Jss)
+
 
 def step_jha(a, ws, rs):
     """
