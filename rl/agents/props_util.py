@@ -4,6 +4,8 @@ import numpy.matlib
 import math
 from scipy.stats import multivariate_normal
 
+B = 5.95925 # tuning param
+B = 0.000001
 
 class NormalDist:
     """
@@ -79,14 +81,13 @@ def renyii(pk0, pk1, a):
 
 def kl(pk0, pk1):
     assert(pk0.S.shape == pk1.S.shape)
-
+    
     dm = pk1.m - pk0.m
     d = pk0.S.shape[0]
     r = np.log(np.linalg.det(pk1.S) / np.linalg.det(pk0.S)) - d + np.trace(np.dot(np.linalg.inv(pk1.S), pk0.S))
     r = r + np.dot(np.dot(dm, np.linalg.inv(pk1.S)), dm)
     r = 0.5 * r
 
-    # return max(r, 0)
     return max(r, 0)
 
 def kl_grad(pk0, pk1):
@@ -100,11 +101,11 @@ def kl_grad(pk0, pk1):
     
     drdm = -1 * np.dot(dm, np.linalg.inv(pk1.S))
 
-    drdS = np.trace(np.linalg.inv(pk1.S))
-    drdS = drdS - detprime(pk0.S) / np.linalg.det(pk0.S)
+    drdS = np.linalg.inv(pk1.S)
+    drdS = drdS - np.linalg.inv(pk0.S)
     drdS = 0.5 * drdS
     
-    return drdm, drdS
+    return drdm, np.diag(drdS)
 
 def is_mvnpdf_baseline(pk, ws, ks, Js):
     """
@@ -425,8 +426,6 @@ def bound_robust_all(a, wss, Jss, rdas, Jmaxs, delta):
 def bound_all_2(wss, Jss, rdas):
     M = Jss.shape[1]
     L = Jss.shape[0]
-
-    B = 1.0 # tuning param
     
     # robust empirical estimate
     Jha = jha_2(wss, Jss)
@@ -575,18 +574,38 @@ def dist_jha_grad_2(pk, pks, Jss, kss, options):
     assert kss.shape[1] == M
 
     kss_trans = np.transpose(kss, axes=[2, 1, 0])
+    log_ps = log_mvnpdf(kss_trans, mean=pk.m, cov=pk.S)
     log_p0s = np.zeros((L, M))
     for i in range(0, L):
         log_p0s[i, :] = log_mvnpdf(
             kss[:, :, i].transpose(), mean=pks[i].m, cov=pks[i].S)
+    ws = np.exp(log_ps - log_p0s)
+    ps = np.exp(log_ps)
     p0s = np.exp(log_p0s)
 
     #print(np.diag(pk.S))
     dpdms, dpdSs = mvnpdf_grad(kss_trans, pk.m, np.diag(pk.S))
-    
-    djdm = np.sum(Jss[:, :, np.newaxis] * dpdms /
+
+    if options.get('normalize_weights'):
+        sum_ws = np.sum(ws, axis=1)[:, np.newaxis]
+ 
+        dwdms = np.sign(dpdms) * np.exp(np.log(np.abs(dpdms)) - log_p0s[:, :, np.newaxis])
+        dwdSs = np.sign(dpdSs) * np.exp(np.log(np.abs(dpdSs)) - log_p0s[:, :, np.newaxis])
+        sum_dwdms = np.sum(dwdms, axis=1)
+        sum_dwdSs = np.sum(dwdSs, axis=1)
+
+        dlt_times_J = Jss
+        djdm = np.sum(dlt_times_J[:, :, np.newaxis] * 
+            (sum_ws[:, :, np.newaxis] * dwdms - ws[:, :, np.newaxis] * sum_dwdms[:, np.newaxis, :]) / sum_ws[:, :, np.newaxis]**2, axis=(0, 1)) / L
+        djdS = np.sum(dlt_times_J[:, :, np.newaxis] * 
+            (sum_ws[:, :, np.newaxis] * dwdSs - ws[:, :, np.newaxis] * sum_dwdSs[:, np.newaxis, :]) / sum_ws[:, :, np.newaxis]**2, axis=(0, 1)) / L
+        #print(sum_ws[:, :, np.newaxis]**2)
+        
+
+    else:
+        djdm = np.sum(Jss[:, :, np.newaxis] * dpdms /
                       p0s[:, :, np.newaxis], axis=(0, 1)) / (M * L)
-    djdS = np.sum(Jss[:, :, np.newaxis] * dpdSs /
+        djdS = np.sum(Jss[:, :, np.newaxis] * dpdSs /
                       p0s[:, :, np.newaxis], axis=(0, 1)) / (M * L)
     
     return djdm, djdS
@@ -625,8 +644,6 @@ def dist_bound_grad_2(pk, pks, Jss, kss, rdas,
     assert kss.shape[2] == L
 
     djdm, djdS = dist_jha_grad_2(pk, pks, Jss, kss, options)
-
-    B = 1.0 # tuning param
     
     drdms = np.zeros((d, L))
     drdSs = np.zeros((d, L))

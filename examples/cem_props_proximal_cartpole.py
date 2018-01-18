@@ -85,6 +85,7 @@ def main(options):
     df_props = pd.DataFrame({'data': callback_props.history['episode_reward']})
     plt.plot(df_props.rolling(window=batch_size_props).mean())
     plt.plot(props.bound_vals)
+    plt.ylim(ymin=0, ymax=200)
     
     #plt.legend(['cem', 'props'], loc='upper left')
     plt.legend(['cem', 'props', 'props bound'], loc='upper left')

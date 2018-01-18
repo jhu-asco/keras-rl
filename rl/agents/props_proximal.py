@@ -170,7 +170,7 @@ class PROPSProximalAgent(Agent):
                             Sub_i = 2*self.pks[j].S[i,i] - 100*self.tol
                         else:
                             Sub_i = min(Sub_i, 2*self.pks[j].S[i,i] - 100*self.tol)
-                    box_constraints.append((self.min_var, Sub_i))
+                    box_constraints.append((self.min_var, None))
                     
                 # minimize using L-BFGS-B
                 analytic_jac = self.bound_opts.get('analytic_jac')
